@@ -15,7 +15,7 @@ timezone:                   "Europe/Paris"
 # users and passwords should be defined in a vault or a plain text file or just here as follow:
 #####################################
 # work_users:
-# - name:           'frederic'
+# - name:           'fanarie'
 #   password:       'password'
 #
 # root_password:    'password'
@@ -23,6 +23,8 @@ timezone:                   "Europe/Paris"
 # password_salt:    'my_password_salt'
 # 
 # foundry_password: 'foundry'
+#
+# pfx_password:     'p455w0rd'
 #####################################
 # You can generate a salt with the following shell command:
 # cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1
