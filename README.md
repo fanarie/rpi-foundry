@@ -7,5 +7,5 @@ To manage ip setting and an ubuntu account not expired (as well as a non update 
 
 Template files can be found in the cloud-init folder and it must copied in the /boot partition just after the image burn. Just Change your targeted IP address in the network-config file.
 
-Used to install a (Foundry VTT)|[https://foundryvtt.com/] server on a RPI4 (use at least a 2GB RAM rpi4 version, prefer a 4GB one).
+Used to install a [Foundry VTT]|(https://foundryvtt.com/) server on a RPI4 (use at least a 2GB RAM rpi4 version, prefer a 4GB one).
 Your linux install archive must be put in the ansible files folder
