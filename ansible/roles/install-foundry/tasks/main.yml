@@ -1,0 +1,5 @@
+---
+- include_tasks:    "01-create_foundry_user.yml"
+- include_tasks:    "02-install_nodejs.yml"
+- include_tasks:    "03-install_caddy.yml"
+- include_tasks:    "04-install_foundry.yml"

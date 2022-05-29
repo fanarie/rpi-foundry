@@ -1,0 +1,19 @@
+[Unit]
+Description=Foundry VTT Server
+After=network.target
+
+[Service]
+Type=simple
+User=foundry
+Group=foundry
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+
+Restart=always
+RestartSec=5
+
+ExecStart=/usr/bin/node /opt/foundry/resources/app/main.js --dataPath=/home/foundry/userdata
+
+[Install]
+WantedBy=multi-user.target

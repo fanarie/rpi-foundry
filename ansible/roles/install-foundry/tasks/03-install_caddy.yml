@@ -1,0 +1,27 @@
+---
+- name: add keyring for caddy
+  apt_key:
+    url:            "https://dl.cloudsmith.io/public/caddy/stable/gpg.key"
+    keyring:        "/etc/apt/trusted.gpg.d/caddy-stable-keyring.gpg"
+  become:           true
+  
+- name: create sources list file for caddy
+  copy:
+    content:        |
+      deb     [signed-by=/etc/apt/trusted.gpg.d/caddy-stable-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
+      deb-src [signed-by=/etc/apt/trusted.gpg.d/caddy-stable-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
+    dest:           "/etc/apt/sources.list.d/caddy-stable.list"
+    owner:          "root"
+    group:          "root"
+    mode:           "0644"
+  become:           true
+  
+- name: Install caddy
+  apt: 
+    name:             "caddy"
+    state:            present
+    update_cache:     yes
+    autoremove:       yes
+    force_apt_get:    yes
+  become:             true
+  

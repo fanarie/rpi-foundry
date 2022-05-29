@@ -1,0 +1,3 @@
+ansible/group_vars/all/passwords.yml
+ansible/files/foundry*.zip
+ansible/files/generated

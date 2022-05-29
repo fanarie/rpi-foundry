@@ -1,0 +1,231 @@
+---
+- name: create foundry folders infrastruture
+  file:
+    path:                           "/opt/foundry"
+    state:                          directory
+    owner:                          "foundry"
+    group:                          "foundry"
+    mode:                           '755'
+  become:                           true
+  
+- name: extract provided foundry archive
+  unarchive:
+    src:                            "FoundryVTT-{{ foundry.version }}.zip"
+    dest:                           "/opt/foundry"
+    owner:                          "foundry"
+    group:                          "foundry"
+    mode:                           "u=rwX,g=rX,a=rX"
+  become:                           true
+  
+- name: create foundry userdata folder
+  file:
+    path:                           "/home/foundry/{{ item }}"
+    state:                          directory
+    owner:                          "foundry"
+    group:                          "foundry"
+    mode:                           '750'
+  with_items:
+  - "userdata"
+  - "userdata/Config"
+  - "userdata/Data"
+  - "userdata/Logs"
+  become:           true
+  
+- name: deploy userdata foundry vtt config template
+  template:
+    src:                            "config.json.j2"
+    dest:                           "/home/foundry/userdata/Config/config.json"
+    owner:                          "foundry"
+    group:                          "foundry"
+    mode:                           '640'
+  register:                         foundry_vtt_config
+  become:                           true
+  
+- name: deploy foundry VTT SystemD template
+  template:
+    src:                            "foundry-vtt.service.j2"
+    dest:                           "/etc/systemd/system/foundry-vtt.service"
+    owner:                          "root"
+    group:                          "root"
+    mode:                           '644'
+  register:                         foundry_vtt_service
+  become:                           true
+  
+- name: start foundry VTT service
+  systemd:
+    name:                           "foundry-vtt.service"
+    daemon_reload:                  "{{ foundry_vtt_service.changed }}"
+    enabled:                        true
+    masked:                         false
+    state:                          "{% if foundry_vtt_config.changed or foundry_vtt_service.changed %}restarted{% else %}started{% endif %}"
+  become:                           true
+  
+- name: Ensures files/generated dir exists on controller
+  file: 
+      path:                         "files/generated"
+      state:                        directory
+  delegate_to:                      localhost
+  
+- name: Generate local private key (2048 bits, RSA)
+  openssl_privatekey:
+    path:                           "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.key"
+    type:                           RSA
+    size:                           2048
+  delegate_to:                      localhost
+  
+- name: Generate local csr
+  openssl_csr:
+    path:                           "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.csr"
+    privatekey_path:                "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.key"
+    common_name:                    "{{ certificates.authority.common_name }}"
+    state_or_province_name:         "{{ certificates.authority.state }}"
+    organization_name:              "{{ certificates.authority.organization }}"
+    organizational_unit_name:       "{{ certificates.authority.organizational_unit }}"
+    useCommonNameForSAN:            false
+    basicConstraints:
+    - CA:TRUE
+  delegate_to:                      localhost
+  
+- name: Generate local Self Signed Certificate Authority
+  openssl_certificate:
+    path:                           "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.crt"
+    csr_path:                       "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.csr"
+    privatekey_path:                "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.key"
+    provider:                       "selfsigned"
+    selfsigned_digest:              "sha256"
+  delegate_to:                      localhost
+  
+- name: Generate local private key
+  openssl_privatekey:
+    path:                           "files/generated/{{ certificates.server.name    | default(certificates.server.common_name)    }}.key"
+    type:                           RSA
+    size:                           2048
+  delegate_to:                      localhost
+  
+- name: Generate local csr
+  openssl_csr:
+    path:                           "files/generated/{{ certificates.server.name    | default(certificates.server.common_name)    }}.csr"
+    privatekey_path:                "files/generated/{{ certificates.server.name    | default(certificates.server.common_name)    }}.key"
+    common_name:                    "{{ certificates.server.common_name }}"
+    state_or_province_name:         "{{ certificates.authority.state }}"
+    organization_name:              "{{ certificates.authority.organization }}"
+    organizational_unit_name:       "{{ certificates.authority.organizational_unit }}"
+    useCommonNameForSAN:            false
+    basicConstraints:
+    - CA:FALSE
+    extended_key_usage:
+    - serverAuth
+    subject_alt_name:               "{{ certificates.server.subject_atl_names       | default([]) }}"
+  delegate_to:                      localhost
+  
+- name: Generate local certificate signed with own CA
+  openssl_certificate:
+    path:                           "files/generated/{{ certificates.server.name    | default(certificates.server.common_name)    }}.crt"
+    csr_path:                       "files/generated/{{ certificates.server.name    | default(certificates.server.common_name)    }}.csr"
+    ownca_path:                     "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.crt"
+    ownca_privatekey_path:          "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.key"
+    provider:                       ownca
+  delegate_to:                      localhost
+  
+- name: Generate local private key for clients
+  openssl_privatekey:
+    path:                           "files/generated/{{ item }}.key"
+    type:                           RSA
+    size:                           2048
+  delegate_to:                      localhost
+  with_items:                       "{{ certificates.clients }}"
+  
+- name: Generate local csr for clients
+  openssl_csr:
+    path:                           "files/generated/{{ item }}.csr"
+    privatekey_path:                "files/generated/{{ item }}.key"
+    common_name:                    "{{ item }}"
+    state_or_province_name:         "{{ certificates.authority.state }}"
+    organization_name:              "{{ certificates.authority.organization }}"
+    organizational_unit_name:       "{{ certificates.authority.organizational_unit }}"
+    useCommonNameForSAN:            false
+    basicConstraints:
+    - CA:FALSE
+    extended_key_usage:
+    - clientAuth
+  delegate_to:                      localhost
+  with_items:                       "{{ certificates.clients }}"
+  
+- name: Generate local certificate signed with own CA for ingress
+  openssl_certificate:
+    path:                           "files/generated/{{ item }}.crt"
+    csr_path:                       "files/generated/{{ item }}.csr"
+    ownca_path:                     "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.crt"
+    ownca_privatekey_path:          "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.key"
+    provider:                       ownca
+  delegate_to:                      localhost
+  with_items:                       "{{ certificates.clients }}"
+  
+- name: Generate PKCS#12 files
+  openssl_pkcs12:
+    action:                         export
+    path:                           "files/generated/{{ item }}.pfx"
+    friendly_name:                  "{{ item }}"
+    passphrase:                     "{{ pfx_password }}"
+    privatekey_path:                "files/generated/{{ item }}.key"
+    certificate_path:               "files/generated/{{ item }}.crt"
+    other_certificates_parse_all:   true
+    other_certificates:
+    - "files/generated/{{ certificates.authority.name | default(certificates.authority.common_name) }}.crt"
+    state:                          present
+  delegate_to:                      localhost
+  with_items:                       "{{ certificates.clients }}"
+  
+- name: create caddy ssl folder
+  file:
+    path:                           "/etc/caddy/ssl"
+    state:                          directory
+    owner:                          "caddy"
+    group:                          "caddy"
+    mode:                           '750'
+  register:                         caddy_ssl_folder
+  become:                           true
+  
+- name: copy caddy ssl certificates and keys
+  copy:
+    src:                            "generated/{{ item }}"
+    dest:                           "/etc/caddy/ssl/"
+    owner:                          "caddy"
+    group:                          "caddy"
+    mode:                           '640'
+  register:                         caddy_ssl_files
+  with_items:
+  - "{{ certificates.authority.name | default(certificates.authority.common_name) }}.crt"
+  - "{{ certificates.server.name    | default(certificates.server.common_name)    }}.crt"
+  - "{{ certificates.server.name    | default(certificates.server.common_name)    }}.key"
+  become:                       true
+  
+- name: copy caddy ssl certificates and keys
+  copy:
+    src:                            "generated/{{ item }}.crt"
+    dest:                           "/etc/caddy/ssl/"
+    owner:                          "caddy"
+    group:                          "caddy"
+    mode:                           '640'
+  register:                         caddy_ssl_files
+  with_items:                       "{{ certificates.clients }}"
+  become:                           true
+  
+- name: deploy caddy template
+  template:
+    src:                            "Caddyfile.j2"
+    dest:                           "/etc/caddy/Caddyfile"
+    owner:                          "caddy"
+    group:                          "caddy"
+    mode:                           '644'
+  register:                         caddy_config
+  become:                           true
+  
+- name: start caddy service
+  systemd:
+    name:                           "caddy.service"
+    enabled:                        true
+    masked:                         false
+    state:                          "{% if caddy_ssl_folder.changed or caddy_ssl_files.changed or caddy_config.changed %}restarted{% else %}started{% endif %}"
+  become:                           true
+  

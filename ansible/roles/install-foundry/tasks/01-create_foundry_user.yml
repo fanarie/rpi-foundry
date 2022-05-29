@@ -1,0 +1,41 @@
+---
+- name: create foundry user
+  user:
+    name:       "foundry"
+    shell:      /bin/bash
+    groups:     []
+    append:     yes
+  become:       true
+  
+- name: set foundry user bash prompt and ls aliases
+  blockinfile:
+    path:       "/home/foundry/.bashrc"
+    create:     yes
+    owner:      "foundry"
+    group:      "foundry"
+    mode:       '0600'
+    block:      |
+      export PS1='{{ foundry_prompt }}'
+      
+      alias ls='ls $LS_OPTIONS'
+      alias ll='ls $LS_OPTIONS -l'
+      alias l='ls $LS_OPTIONS -lA'
+  become:       true
+  
+- name: set foundry user vimrc config
+  lineinfile:
+    path:       "/home/foundry/.vimrc"
+    create:     yes
+    owner:      "foundry"
+    group:      "foundry"
+    mode:       '0600'
+    line:       set mouse-=a
+  become:       true
+    
+- name: set foundry user password
+  user:
+    name:       "foundry"
+    password:   "{{ foundry_password | password_hash('sha512', password_salt | default('')) }}"
+  when:         foundry_password is defined
+  become:       true
+  
