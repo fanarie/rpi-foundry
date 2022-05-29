@@ -3,7 +3,6 @@ domain_name:                "yggdrasil.local"
 fqdn:                       "{{ hostname }}.{{ domain_name }}"
 
 internal_host:              "{{ fqdn }}"
-external_host:              "iy1sixwy.fbxos.fr"
 
 gateway:                    "192.168.1.1"
 domain_name_servers:
@@ -25,6 +24,8 @@ timezone:                   "Europe/Paris"
 # foundry_password: 'foundry'
 #
 # pfx_password:     'p455w0rd'
+# 
+# external_host:    'my.external.domain'
 #####################################
 # You can generate a salt with the following shell command:
 # cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1
