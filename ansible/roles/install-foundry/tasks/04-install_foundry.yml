@@ -1,63 +1,113 @@
 ---
 - name: create foundry folders infrastruture
   file:
-    path:                           "/opt/foundry"
+    path:                           "/opt/foundry_v{{ major_version }}"
     state:                          directory
     owner:                          "foundry"
     group:                          "foundry"
     mode:                           '755'
+  vars:
+    major_version:                  "{{ item.split('.')[0] }}"
+  with_items:                       "{{ foundry.versions }}"
   become:                           true
   
 - name: extract provided foundry archive
   unarchive:
-    src:                            "FoundryVTT-{{ foundry.version }}.zip"
-    dest:                           "/opt/foundry"
+    src:                            "FoundryVTT-{{ version }}.zip"
+    dest:                           "/opt/foundry_v{{ major_version }}"
     owner:                          "foundry"
     group:                          "foundry"
     mode:                           "u=rwX,g=rX,a=rX"
+  vars:
+    version:                        "{{ item }}"
+    major_version:                  "{{ item.split('.')[0] }}"
+  with_items:                       "{{ foundry.versions }}"
   become:                           true
   
-- name: create foundry userdata folder
+- name: create foundry userdata folders
   file:
-    path:                           "/home/foundry/{{ item }}"
+    path:                           "/home/foundry/userdata_v{{ major_version }}"
     state:                          directory
     owner:                          "foundry"
     group:                          "foundry"
     mode:                           '750'
-  with_items:
-  - "userdata"
-  - "userdata/Config"
-  - "userdata/Data"
-  - "userdata/Logs"
-  become:           true
+  vars:
+    major_version:                  "{{ item.split('.')[0] }}"
+  with_items:                       "{{ foundry.versions }}"
+  become:                           true
+  
+- name: create foundry userdata subfolders
+  file:
+    path:                           "/home/foundry/userdata_v{{ major_version }}/{{ item.0 }}"
+    state:                          directory
+    owner:                          "foundry"
+    group:                          "foundry"
+    mode:                           '750'
+  vars:
+    major_version:                  "{{ item.1.split('.')[0] }}"
+  with_nested:
+  - [ "Config", "Data", "Logs" ]
+  - "{{ foundry.versions }}"
+  become:                           true
   
 - name: deploy userdata foundry vtt config template
   template:
     src:                            "config.json.j2"
-    dest:                           "/home/foundry/userdata/Config/config.json"
+    dest:                           "/home/foundry/userdata_v{{ major_version }}/Config/config.json"
     owner:                          "foundry"
     group:                          "foundry"
     mode:                           '640'
   register:                         foundry_vtt_config
+  vars:
+    major_version:                  "{{ item.split('.')[0] }}"
+    is_current_version:             "{{ index == 0 }}"
+  loop:                             "{{ foundry.versions }}"
+  loop_control:
+    index_var:                      index
   become:                           true
   
 - name: deploy foundry VTT SystemD template
   template:
     src:                            "foundry-vtt.service.j2"
-    dest:                           "/etc/systemd/system/foundry-vtt.service"
+    dest:                           "/etc/systemd/system/foundry-vtt_v{{ major_version }}.service"
     owner:                          "root"
     group:                          "root"
     mode:                           '644'
   register:                         foundry_vtt_service
+  vars:
+    major_version:                  "{{ item.split('.')[0] }}"
+    is_current_version:             "{{ index == 0 }}"
+  loop:                             "{{ foundry.versions }}"
+  loop_control:
+    index_var:                      index
   become:                           true
   
-- name: start foundry VTT service
+- name: check that all non first versions are stopped
   systemd:
-    name:                           "foundry-vtt.service"
-    daemon_reload:                  "{{ foundry_vtt_service.changed }}"
+    name:                           "foundry-vtt_v{{ major_version }}.service"
+    daemon_reload:                  true
+    enabled:                        false
+    masked:                         false
+    state:                          stopped
+  when:                             not is_current_version
+  vars:
+    major_version:                  "{{ item.split('.')[0] }}"
+    is_current_version:             "{{ index == 0 }}"
+  loop:                             "{{ foundry.versions }}"
+  loop_control:
+    index_var:                      index
+  become:                           true
+  
+- name: start foundry VTT service for current version
+  systemd:
+    name:                           "foundry-vtt_v{{ major_version }}.service"
+    daemon_reload:                  true
     enabled:                        true
     masked:                         false
-    state:                          "{% if foundry_vtt_config.changed or foundry_vtt_service.changed %}restarted{% else %}started{% endif %}"
+    state:                          "{% if has_changed %}restarted{% else %}started{% endif %}"
+  vars:
+    major_version:                  "{{ ( foundry.versions           | first ).split('.')[0] }}"
+    has_changed:                    "{{ ( foundry_vtt_config.results | first ).changed or ( foundry_vtt_service.results | first ).changed }}"
   become:                           true
   
 - name: Ensures files/generated dir exists on controller

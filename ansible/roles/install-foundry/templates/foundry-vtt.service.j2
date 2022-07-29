@@ -4,16 +4,18 @@ After=network.target
 
 [Service]
 Type=simple
+
 User=foundry
 Group=foundry
+
 LimitNOFILE=infinity
 LimitNPROC=infinity
 LimitCORE=infinity
 
-Restart=always
+Restart=on-failure
 RestartSec=5
 
-ExecStart=/usr/bin/node /opt/foundry/resources/app/main.js --dataPath=/home/foundry/userdata
+ExecStart=/usr/bin/node /opt/foundry_v{{ major_version }}/resources/app/main.js --dataPath=/home/foundry/userdata_v{{ major_version }}
 
 [Install]
 WantedBy=multi-user.target
