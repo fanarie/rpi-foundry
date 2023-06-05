@@ -2,7 +2,7 @@
 - name: create foundry user
   user:
     name:       "foundry"
-    shell:      /bin/bash
+    shell:      "/bin/bash"
     groups:     []
     append:     yes
   become:       true

@@ -31,11 +31,13 @@ timezone:                   "Europe/Paris"
 # cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1
 
 foundry:
-  versions:               [ "9.269", "10.276" ]
+  version:                  "11.300"
   ports:
     local:                  30000
-    internal:               31337
-    external:               31337
+    internal:                1337
+    external:                1337
+  
+  autostart:                true
   
 certificates:
   authority:
@@ -47,16 +49,9 @@ certificates:
   
   server:
     common_name:            "{{ internal_host }}"
-    subject_atl_names:
-    - "DNS:*.{{ domain_name }}"
-    - "DNS:{{ external_host }}"
+    subject_atl_names:      "{{ ( [ 'DNS:*.' + domain_name ] ) + ( [ 'DNS:' ] | product( external_hosts | default([]) ) | map('join') | list ) }}"
   
   clients:
   - "phaelyn"
-  - "gwenola"
-  - "kensan"
-  - "neldorin"
-  - "bill"
-  - "glim"
   - "visiteur"
   

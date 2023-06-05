@@ -12,4 +12,10 @@ ethernets:
     optional: false
     addresses:
     - 192.168.1.20/24
-    gateway4: 192.168.1.1
+    gateway4:       192.168.1.1
+#    
+# ethernets:
+#   eth0:
+#     dhcp4:    true
+#     optional: false
+    

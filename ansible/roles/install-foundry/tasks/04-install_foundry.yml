@@ -7,10 +7,11 @@
     group:                          "foundry"
     mode:                           '755'
   vars:
-    major_version:                  "{{ item.split('.')[0] }}"
-  with_items:                       "{{ foundry.versions }}"
+    major_version:                  "{{ foundry.version.split('.')[0] }}"
   become:                           true
-  
+  notify:
+    - restart foundry-vtt
+    
 - name: extract provided foundry archive
   unarchive:
     src:                            "FoundryVTT-{{ version }}.zip"
@@ -19,11 +20,12 @@
     group:                          "foundry"
     mode:                           "u=rwX,g=rX,a=rX"
   vars:
-    version:                        "{{ item }}"
-    major_version:                  "{{ item.split('.')[0] }}"
-  with_items:                       "{{ foundry.versions }}"
+    version:                        "{{ foundry.version }}"
+    major_version:                  "{{ foundry.version.split('.')[0] }}"
   become:                           true
-  
+  notify:
+    - restart foundry-vtt
+    
 - name: create foundry userdata folders
   file:
     path:                           "/home/foundry/userdata_v{{ major_version }}"
@@ -32,24 +34,28 @@
     group:                          "foundry"
     mode:                           '750'
   vars:
-    major_version:                  "{{ item.split('.')[0] }}"
-  with_items:                       "{{ foundry.versions }}"
+    major_version:                  "{{ foundry.version.split('.')[0] }}"
   become:                           true
-  
+  notify:
+    - restart foundry-vtt
+    
 - name: create foundry userdata subfolders
   file:
-    path:                           "/home/foundry/userdata_v{{ major_version }}/{{ item.0 }}"
+    path:                           "/home/foundry/userdata_v{{ major_version }}/{{ item }}"
     state:                          directory
     owner:                          "foundry"
     group:                          "foundry"
     mode:                           '750'
   vars:
-    major_version:                  "{{ item.1.split('.')[0] }}"
-  with_nested:
-  - [ "Config", "Data", "Logs" ]
-  - "{{ foundry.versions }}"
+    major_version:                  "{{ foundry.version.split('.')[0] }}"
+  with_items:
+    - "Config"
+    - "Data"
+    - "Logs"
   become:                           true
-  
+  notify:
+    - restart foundry-vtt
+    
 - name: deploy userdata foundry vtt config template
   template:
     src:                            "config.json.j2"
@@ -59,13 +65,11 @@
     mode:                           '640'
   register:                         foundry_vtt_config
   vars:
-    major_version:                  "{{ item.split('.')[0] }}"
-    is_current_version:             "{{ index == 0 }}"
-  loop:                             "{{ foundry.versions }}"
-  loop_control:
-    index_var:                      index
+    major_version:                  "{{ foundry.version.split('.')[0] }}"
   become:                           true
-  
+  notify:
+    - restart foundry-vtt
+    
 - name: deploy foundry VTT SystemD template
   template:
     src:                            "foundry-vtt.service.j2"
@@ -75,40 +79,10 @@
     mode:                           '644'
   register:                         foundry_vtt_service
   vars:
-    major_version:                  "{{ item.split('.')[0] }}"
-    is_current_version:             "{{ index == 0 }}"
-  loop:                             "{{ foundry.versions }}"
-  loop_control:
-    index_var:                      index
+    major_version:                  "{{ foundry.version.split('.')[0] }}"
   become:                           true
-  
-- name: check that all non first versions are stopped
-  systemd:
-    name:                           "foundry-vtt_v{{ major_version }}.service"
-    daemon_reload:                  true
-    enabled:                        false
-    masked:                         false
-    state:                          stopped
-  when:                             not is_current_version
-  vars:
-    major_version:                  "{{ item.split('.')[0] }}"
-    is_current_version:             "{{ index == 0 }}"
-  loop:                             "{{ foundry.versions }}"
-  loop_control:
-    index_var:                      index
-  become:                           true
-  
-- name: start foundry VTT service for current version
-  systemd:
-    name:                           "foundry-vtt_v{{ major_version }}.service"
-    daemon_reload:                  true
-    enabled:                        true
-    masked:                         false
-    state:                          "{% if has_changed %}restarted{% else %}started{% endif %}"
-  vars:
-    major_version:                  "{{ ( foundry.versions           | first ).split('.')[0] }}"
-    has_changed:                    "{{ ( foundry_vtt_config.results | first ).changed or ( foundry_vtt_service.results | first ).changed }}"
-  become:                           true
+  notify:
+    - restart foundry-vtt
   
 - name: Ensures files/generated dir exists on controller
   file: 
@@ -201,7 +175,7 @@
   delegate_to:                      localhost
   with_items:                       "{{ certificates.clients }}"
   
-- name: Generate local certificate signed with own CA for ingress
+- name: Generate local certificate signed with own CA
   openssl_certificate:
     path:                           "files/generated/{{ item }}.crt"
     csr_path:                       "files/generated/{{ item }}.csr"
@@ -235,7 +209,9 @@
     mode:                           '750'
   register:                         caddy_ssl_folder
   become:                           true
-  
+  notify:
+    - restart caddy
+    
 - name: copy caddy ssl certificates and keys
   copy:
     src:                            "generated/{{ item }}"
@@ -249,7 +225,9 @@
   - "{{ certificates.server.name    | default(certificates.server.common_name)    }}.crt"
   - "{{ certificates.server.name    | default(certificates.server.common_name)    }}.key"
   become:                       true
-  
+  notify:
+    - restart caddy
+    
 - name: copy caddy ssl certificates and keys
   copy:
     src:                            "generated/{{ item }}.crt"
@@ -260,6 +238,32 @@
   register:                         caddy_ssl_files
   with_items:                       "{{ certificates.clients }}"
   become:                           true
+  notify:
+    - restart caddy
+    
+- name: set caddy_internal_hosts fact
+  set_fact:
+    caddy_internal_hosts:
+    - host:                         "*.{{ domain_name }}:{{ foundry.ports.internal }}"
+      reverse_proxy:                "localhost:{{ foundry.ports.local }}"
+      ssl:
+        cacert:                     "{{ certificates.authority.name | default(certificates.authority.common_name)   }}.crt"
+        crt:                        "{{ certificates.server.name    | default(certificates.server.common_name)      }}.crt"
+        key:                        "{{ certificates.server.name    | default(certificates.server.common_name)      }}.key"
+  
+- name: set caddy_external_hosts fact
+  set_fact:
+    caddy_external_hosts:
+    - host:                         "{{ external_hosts | product    ([ ':' + foundry.ports.external | string ]) | map('join') | list | join(', ') }}"
+      reverse_proxy:                "localhost:{{ foundry.ports.local }}"
+      ssl:
+        cacert:                     "{{ certificates.authority.name | default(certificates.authority.common_name)   }}.crt"
+        crt:                        "{{ certificates.server.name    | default(certificates.server.common_name)      }}.crt"
+        key:                        "{{ certificates.server.name    | default(certificates.server.common_name)      }}.key"
+        client_certs:               "{{ certificates.clients        | default([]) | product( [ '.crt' ] ) | map('join') | list }}"
+  when:                             
+  - external_hosts                  is defined
+  - external_hosts  | length        > 0
   
 - name: deploy caddy template
   template:
@@ -269,13 +273,43 @@
     group:                          "caddy"
     mode:                           '644'
   register:                         caddy_config
+  vars:
+    caddy_hosts:                    "{{ ( caddy_internal_hosts + caddy_external_hosts | default([]) ) }}"
+  become:                           true
+  notify:
+    - restart caddy
+  
+- name: enable caddy service
+  systemd:
+    name:                           "caddy.service"
+    enabled:                        "{{ foundry.autostart | default(true) }}"
+    daemon_reload:                  true
+    masked:                         false
+  become:                           true
+  
+- name: enable foundryVTT service
+  systemd:
+    name:                           "foundry-vtt_v{{ major_version }}.service"
+    enabled:                        "{{ foundry.autostart | default(true) }}"
+    daemon_reload:                  true
+    masked:                         false
+  vars:
+    major_version:                  "{{ foundry.version.split('.')[0] }}"
   become:                           true
   
 - name: start caddy service
   systemd:
     name:                           "caddy.service"
-    enabled:                        true
-    masked:                         false
-    state:                          "{% if caddy_ssl_folder.changed or caddy_ssl_files.changed or caddy_config.changed %}restarted{% else %}started{% endif %}"
+    state:                          "{% if foundry.autostart | default(true) %}started{% else %}stopped{% endif %}"
+  register:                         caddy_start
+  become:                           true
+  
+- name: start foundry VTT service for current version
+  systemd:
+    name:                           "foundry-vtt_v{{ major_version }}.service"
+    state:                          "{% if foundry.autostart | default(true) %}started{% else %}stopped{% endif %}"
+  vars:
+    major_version:                  "{{ foundry.version.split('.')[0] }}"
+  register:                         foundryvtt_start
   become:                           true
   

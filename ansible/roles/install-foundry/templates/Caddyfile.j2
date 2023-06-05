@@ -8,11 +8,13 @@
 # this machine's public IP, then replace ":80" below with your
 # domain name.
 
-{% for caddy_host in caddy_hosts %}
+{% for caddy_host in ( caddy_hosts ) %}
 {{ caddy_host.host }} {
         reverse_proxy {{ caddy_host.reverse_proxy }}
 
         encode zstd gzip
+
+        header Access-Control-Allow-Origin  "*"
 
         tls /etc/caddy/ssl/{{ caddy_host.ssl.crt }} /etc/caddy/ssl/{{ caddy_host.ssl.key }}{% if caddy_host.ssl.client_certs is defined %} {
                 client_auth {

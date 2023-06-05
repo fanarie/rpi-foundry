@@ -1,19 +1,2 @@
 ---
 node_repo:          "node_16.x"
-  
-caddy_hosts:
-- host:             "{{ internal_host }}:{{ foundry.ports.internal }}"
-  reverse_proxy:    "localhost:{{  foundry.ports.local }}"
-  ssl:  
-    crt:            "{{ certificates.server.name    | default(certificates.server.common_name)    }}.crt"
-    key:            "{{ certificates.server.name    | default(certificates.server.common_name)    }}.key"
-    cacert:         "{{ certificates.authority.name | default(certificates.authority.common_name) }}.crt"
-  
-- host:             "{{ external_host }}:{{ foundry.ports.external }}"
-  reverse_proxy:    "localhost:{{ foundry.ports.local }}"
-  ssl:  
-    crt:            "{{ certificates.server.name    | default(certificates.server.common_name)    }}.crt"
-    key:            "{{ certificates.server.name    | default(certificates.server.common_name)    }}.key"
-    cacert:         "{{ certificates.authority.name | default(certificates.authority.common_name) }}.crt"
-    client_certs:   "{{ certificates.clients        | product( [ '.crt' ] ) | map('join') | list  }}" 
-  
