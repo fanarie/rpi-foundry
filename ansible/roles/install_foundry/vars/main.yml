@@ -1,0 +1,6 @@
+---
+node_repo_signature: "https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key"
+node_repo_signature_gpg: "nodesource.gpg"
+node_repo: "https://deb.nodesource.com/node_20.x"
+node_distribution_release: "nodistro"
+node_distribution_source: "main"

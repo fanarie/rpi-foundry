@@ -1,0 +1,14 @@
+---
+- name: Restart homebrewery
+  ansible.builtin.systemd_service:
+    name: "homebrewery.service"
+    state: "restarted"
+  when: homebrewery_start is not changed
+  become: true
+
+- name: Restart mongod
+  ansible.builtin.systemd_service:
+    name: "mongod.service"
+    state: "restarted"
+  when: mongodb_start is not changed
+  become: true

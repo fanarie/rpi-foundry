@@ -1,0 +1,12 @@
+---
+- name: Include create homebrew user task
+  ansible.builtin.include_tasks: "01-create_hombrew_user.yml"
+
+- name: Include install nodejs task
+  ansible.builtin.include_tasks: "02-install_nodejs.yml"
+
+- name: Include isntall mongodb task
+  ansible.builtin.include_tasks: "03-install_mongodb.yml"
+
+- name: Include install homebrewery task
+  ansible.builtin.include_tasks: "04-install_homebrewery.yml"

@@ -1,0 +1,50 @@
+---
+- name: Add keyring for mongodb
+  ansible.builtin.apt_key:
+    url: "{{ mongodb_repo_signature }}"
+    keyring: "/etc/apt/trusted.gpg.d/{{ mongodb_repo_signature_gpg }}"
+  become: true
+
+- name: Create sources list file for mongodb
+  ansible.builtin.apt_repository:
+    filename: "mongodb-org"
+    repo: "deb [arch=amd64,arm64 signed-by=/etc/apt/trusted.gpg.d/{{ mongodb_repo_signature_gpg }}] {{ mongodb_repo }} {{\
+         \ mongodb_distribution_release }} {{ mongodb_distribution_source }}"
+  become: true
+
+- name: Install mongodb
+  ansible.builtin.apt:
+    name: "mongodb-org"
+    state: present
+    update_cache: true
+    autoremove: true
+    force_apt_get: true
+  become: true
+  notify:
+    - Restart mongod
+
+- name: Deploy mongodb config
+  ansible.builtin.template:
+    src: "mongod.conf.j2"
+    dest: "/etc/mongod.conf"
+    owner: "mongodb"
+    group: "mongodb"
+    mode: '640'
+  become: true
+  notify:
+    - Restart mongod
+
+- name: Enable mongod service
+  ansible.builtin.systemd_service:
+    name: "mongod.service"
+    enabled: "{{ homebrewery.autostart | default(autostart) }}"
+    daemon_reload: true
+    masked: false
+  become: true
+
+- name: Start mongod service
+  ansible.builtin.systemd_service:
+    name: "mongod.service"
+    state: "started"
+  register: mongodb_start
+  become: true

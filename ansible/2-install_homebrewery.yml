@@ -1,0 +1,5 @@
+---
+- name: Install homebrewery
+  hosts: server
+  roles:
+    - install_homebrewery

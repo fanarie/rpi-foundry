@@ -1,0 +1,160 @@
+---
+- name: Create foundry folders infrastruture
+  ansible.builtin.file:
+    path: "/opt/foundry_v{{ major_version }}"
+    state: directory
+    owner: "foundry"
+    group: "foundry"
+    mode: '755'
+  vars:
+    major_version: "{{ foundry.version.split('.')[0] }}"
+  become: true
+  notify:
+    - Restart foundry-vtt
+
+- name: Get foundry root folder stat
+  ansible.builtin.stat:
+    path: "/opt/foundry_v{{ major_version }}"
+  register: foundry_dir
+  vars:
+    major_version: "{{ foundry.version.split('.')[0] }}"
+  become: true
+
+- name: Extract foundry archive
+  block:
+    - name: Create temp folder
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "foundry"
+      register: foundry_tmp_dir
+      changed_when: false
+
+    - name: Extract provided foundryVTT archive
+      ansible.builtin.unarchive:
+        src: "FoundryVTT-{{ version }}.zip"
+        dest: "{{ foundry_tmp_dir.path }}"
+        mode: "u+r+wX,g+rX-w,o+rX-w"
+      vars:
+        version: "{{ foundry.version }}"
+      changed_when: false
+
+    - name: Set foundry permission on temp folder
+      ansible.builtin.file:
+        path: "{{ foundry_tmp_dir.path }}"
+        owner: "foundry"
+        group: "foundry"
+        recurse: true
+      changed_when: false
+      become: true
+
+    - name: Set time to foundry root temp folder
+      ansible.builtin.file:
+        path: "{{ foundry_tmp_dir.path }}"
+        modification_time: "{{ '%Y%m%d%H%M.%S' | strftime(foundry_dir.stat.mtime) }}"
+      changed_when: false
+      become: true
+
+    - name: Sync foundry folder
+      ansible.posix.synchronize:
+        src: "{{ foundry_tmp_dir.path }}/"
+        dest: "/opt/foundry_v{{ major_version }}/"
+        delete: true
+        owner: true
+        group: true
+        perms: true
+        copy_links: false
+        links: true
+        checksum: true
+        times: false
+      delegate_to: "{{ inventory_hostname }}"
+      vars:
+        major_version: "{{ foundry.version.split('.')[0] }}"
+      become: true
+      notify:
+        - Restart foundry-vtt
+
+  always:
+    - name: Create Temp folder
+      ansible.builtin.file:
+        state: absent
+        path: "{{ foundry_tmp_dir.path }}"
+      changed_when: false
+      when: foundry_tmp_dir is defined
+      become: true
+
+- name: Create foundry userdata folders
+  ansible.builtin.file:
+    path: "/home/foundry/userdata_v{{ major_version }}"
+    state: directory
+    owner: "foundry"
+    group: "foundry"
+    mode: '750'
+  vars:
+    major_version: "{{ foundry.version.split('.')[0] }}"
+  become: true
+  notify:
+    - Restart foundry-vtt
+
+- name: Create foundry userdata subfolders
+  ansible.builtin.file:
+    path: "/home/foundry/userdata_v{{ major_version }}/{{ item }}"
+    state: directory
+    owner: "foundry"
+    group: "foundry"
+    mode: '750'
+  vars:
+    major_version: "{{ foundry.version.split('.')[0] }}"
+  with_items:
+    - "Config"
+    - "Data"
+    - "Logs"
+  become: true
+  notify:
+    - Restart foundry-vtt
+
+- name: Deploy userdata foundry vtt config template
+  ansible.builtin.template:
+    src: "config.json.j2"
+    dest: "/home/foundry/userdata_v{{ major_version }}/Config/config.json"
+    owner: "foundry"
+    group: "foundry"
+    mode: '640'
+  register: foundry_vtt_config
+  vars:
+    major_version: "{{ foundry.version.split('.')[0] }}"
+  become: true
+  notify:
+    - Restart foundry-vtt
+
+- name: Deploy foundry VTT SystemD template
+  ansible.builtin.template:
+    src: "foundry-vtt.service.j2"
+    dest: "/etc/systemd/system/foundry-vtt_v{{ major_version }}.service"
+    owner: "root"
+    group: "root"
+    mode: '644'
+  register: foundry_vtt_service
+  vars:
+    major_version: "{{ foundry.version.split('.')[0] }}"
+  become: true
+  notify:
+    - Restart foundry-vtt
+
+- name: Enable foundryVTT service
+  ansible.builtin.systemd_service:
+    name: "foundry-vtt_v{{ major_version }}.service"
+    enabled: "{{ foundry.autostart | default(autostart) }}"
+    daemon_reload: true
+    masked: false
+  vars:
+    major_version: "{{ foundry.version.split('.')[0] }}"
+  become: true
+
+- name: Start foundry VTT service for current version
+  ansible.builtin.systemd_service:
+    name: "foundry-vtt_v{{ major_version }}.service"
+    state: "started"
+  vars:
+    major_version: "{{ foundry.version.split('.')[0] }}"
+  register: foundryvtt_start
+  become: true

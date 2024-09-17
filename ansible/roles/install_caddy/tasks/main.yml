@@ -1,0 +1,5 @@
+---
+- name: Include install_caddy task
+  ansible.builtin.include_tasks: "01-install_caddy.yml"
+- name: Include deploy_caddy task
+  ansible.builtin.include_tasks: "02-deploy_caddy.yml"

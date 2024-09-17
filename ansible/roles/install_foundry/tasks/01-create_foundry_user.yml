@@ -1,0 +1,39 @@
+---
+- name: Create foundry user
+  ansible.builtin.user:
+    name: "foundry"
+    shell: "/bin/bash"
+    groups: []
+    append: true
+  become: true
+
+- name: Set foundry user bash prompt and ls aliases
+  ansible.builtin.blockinfile:
+    path: "/home/foundry/.bashrc"
+    create: true
+    owner: "foundry"
+    group: "foundry"
+    mode: '0600'
+    block: |
+      export PS1='{{ foundry_prompt }}'
+      alias ls='ls $LS_OPTIONS'
+      alias ll='ls $LS_OPTIONS -l'
+      alias l='ls $LS_OPTIONS -lA'
+  become: true
+
+- name: Set foundry user vimrc config
+  ansible.builtin.lineinfile:
+    path: "/home/foundry/.vimrc"
+    create: true
+    owner: "foundry"
+    group: "foundry"
+    mode: '0600'
+    line: set mouse-=a
+  become: true
+
+- name: Set foundry user password
+  ansible.builtin.user:
+    name: "foundry"
+    password: "{{ foundry_password | password_hash('sha512', password_salt | default('')) }}"
+  when: foundry_password is defined
+  become: true

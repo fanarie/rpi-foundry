@@ -1,6 +1,0 @@
----
-- name: install foundry
-  hosts: all
-  roles:
-  - install-foundry
-  

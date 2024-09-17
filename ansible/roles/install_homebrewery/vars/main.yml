@@ -1,0 +1,12 @@
+---
+node_repo_signature: "https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key"
+node_repo_signature_gpg: "nodesource.gpg"
+node_repo: "https://deb.nodesource.com/node_20.x"
+node_distribution_release: "nodistro"
+node_distribution_source: "main"
+
+mongodb_repo_signature: "https://www.mongodb.org/static/pgp/server-7.0.asc"
+mongodb_repo_signature_gpg: "mongodb-server-7.0.gpg"
+mongodb_repo: "https://repo.mongodb.org/apt/ubuntu"
+mongodb_distribution_release: "jammy/mongodb-org/7.0"
+mongodb_distribution_source: "multiverse"

@@ -1,0 +1,5 @@
+---
+- name: Install foundry
+  hosts: server
+  roles:
+    - install_foundry

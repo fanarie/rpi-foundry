@@ -1,57 +1,38 @@
 ---
-domain_name:                "yggdrasil.local"
-fqdn:                       "{{ hostname }}.{{ domain_name }}"
+domain_name: "yggdrasil.local"
+fqdn: "{{ hostname }}.{{ domain_name }}"
+internal_host: "{{ fqdn }}"
+external_hosts:
+  - "iy1sixwy.fbxos.fr"
 
-internal_host:              "{{ fqdn }}"
-
-gateway:                    "192.168.1.1"
-domain_name_servers:
-- "127.0.0.1"
-- "192.168.1.1"
-
-timezone:                   "Europe/Paris"
-
-# users and passwords should be defined in a vault or a plain text file or just here as follow:
-#####################################
-# work_users:
-# - name:           'fanarie'
-#   password:       'password'
-#
-# root_password:    'password'
-#
-# password_salt:    'my_password_salt'
-# 
-# foundry_password: 'foundry'
-#
-# pfx_password:     'p455w0rd'
-# 
-# external_host:    'my.external.domain'
-#####################################
-# You can generate a salt with the following shell command:
-# cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1
+autostart: true
 
 foundry:
-  version:                  "11.300"
-  ports:
-    local:                  30000
-    internal:                1337
-    external:                1337
-  
-  autostart:                true
-  
-certificates:
-  authority:
-    name:                   "{{ domain_name }}"
-    common_name:            "Yggdrasil Certificate Authority"
-    state:                  "MIDGARD"
-    organization:           "YGGDRASIL"
-    organizational_unit:    "YGGDRASIL.LOCAL"
-  
-  server:
-    common_name:            "{{ internal_host }}"
-    subject_atl_names:      "{{ ( [ 'DNS:*.' + domain_name ] ) + ( [ 'DNS:' ] | product( external_hosts | default([]) ) | map('join') | list ) }}"
-  
-  clients:
-  - "phaelyn"
-  - "visiteur"
-  
+  version: "12.331"
+  port: 30000 
+
+homebrewery:
+  version: "3.14.2"
+  port: 8000
+  mongodb:
+    port: 27017
+
+caddy:
+  port: 1337
+
+  certificates:
+    authority:
+        name: "{{ domain_name }}"
+        common_name: "Yggdrasil Certificate Authority"
+        state: "MIDGARD"
+        organization: "YGGDRASIL"
+        organizational_unit: "YGGDRASIL.LOCAL"
+
+    server:
+        common_name: "{{ internal_host }}"
+        subject_atl_names: "{{ ( [ 'DNS:*.' + domain_name ] ) + ( [ 'DNS:' ] | product( external_hosts | default([]) )\
+                          \ | map('join') | list ) }}"
+
+    clients:
+      - "phaelyn"
+      - "visiteur"

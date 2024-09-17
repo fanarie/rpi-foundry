@@ -1,0 +1,5 @@
+---
+- name: Install caddy
+  hosts: server
+  roles:
+    - install_caddy

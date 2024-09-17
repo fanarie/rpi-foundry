@@ -1,0 +1,115 @@
+---
+- name: Create homebrewery folders infrastruture
+  ansible.builtin.file:
+    path: "/opt/homebrewery"
+    state: directory
+    owner: "homebrew"
+    group: "homebrew"
+    mode: "755"
+  become: true
+  notify:
+    - Restart homebrewery
+
+- name: Get homebrewery root folder stat
+  ansible.builtin.stat:
+    path: "/opt/homebrewery"
+  register: homebrewery_dir
+  become: true
+
+- name: Extract homebrewery archive
+  block:
+    - name: Create temp folder
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "homebrewery"
+      register: homebrewery_tmp_dir
+      changed_when: false
+
+    - name: Extract provided homebrewery archive
+      ansible.builtin.unarchive:
+        src: "homebrewery-{{ homebrewery.version }}.zip"
+        dest: "{{ homebrewery_tmp_dir.path }}"
+        mode: "u+rwX,g+rX-w,o+rX-w"
+      changed_when: false
+
+    - name: Deploy homebrewery config
+      ansible.builtin.template:
+        src: "local.json.j2"
+        dest: "{{ homebrewery_tmp_dir.path }}/homebrewery-{{ homebrewery.version }}/config/local.json"
+        mode: "640"
+      changed_when: false
+
+    - name: Install node modules
+      ansible.builtin.command:
+        cmd: "npm install"
+        chdir: "{{ homebrewery_tmp_dir.path }}/homebrewery-{{ homebrewery.version }}"
+      changed_when: false
+
+    - name: Set homebrewery permission on temp folder
+      ansible.builtin.file:
+        path: "{{ homebrewery_tmp_dir.path }}/homebrewery-{{ homebrewery.version }}"
+        owner: "homebrew"
+        group: "homebrew"
+        recurse: true
+      changed_when: false
+      become: true
+
+    - name: Set time to homebrewery root temp folder
+      ansible.builtin.file:
+        path: "{{ homebrewery_tmp_dir.path }}/homebrewery-{{ homebrewery.version }}"
+        modification_time: "{{ '%Y%m%d%H%M.%S' | strftime(homebrewery_dir.stat.mtime) }}"
+      changed_when: false
+      become: true
+
+    - name: Sync homebrewery folder
+      ansible.posix.synchronize:
+        src: "{{ homebrewery_tmp_dir.path }}/homebrewery-{{ homebrewery.version }}/"
+        dest: "/opt/homebrewery/"
+        delete: true
+        owner: true
+        group: true
+        perms: true
+        copy_links: false
+        links: true
+        checksum: true
+        times: false
+      delegate_to: "{{ inventory_hostname }}"
+      become: true
+      notify:
+        - Restart homebrewery
+
+  always:
+    - name: Create Temp folder
+      ansible.builtin.file:
+        state: absent
+        path: "{{ homebrewery_tmp_dir.path }}"
+      changed_when: false
+      when: homebrewery_tmp_dir is defined
+      become: true
+
+- name: Deploy homebrewery SystemD template
+  ansible.builtin.template:
+    src: "homebrewery.service.j2"
+    dest: "/etc/systemd/system/homebrewery.service"
+    owner: "root"
+    group: "root"
+    mode: '644'
+  register: foundry_vtt_service
+  become: true
+  notify:
+    - Restart homebrewery
+
+- name: Enable homebrewery service
+  ansible.builtin.systemd:
+    name: "homebrewery.service"
+    enabled: "{{ homebrewery.autostart | default(autostart) }}"
+    daemon_reload: true
+    masked: false
+  become: true
+
+- name: Start homebrewery service
+  ansible.builtin.systemd:
+    name: "homebrewery.service"
+    state: "started"
+  register: homebrewery_start
+  become: true

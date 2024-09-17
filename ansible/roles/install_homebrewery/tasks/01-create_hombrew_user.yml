@@ -1,0 +1,39 @@
+---
+- name: Create homebrew user
+  ansible.builtin.user:
+    name: "homebrew"
+    shell: "/bin/bash"
+    groups: []
+    append: true
+  become: true
+
+- name: Set homebrew user bash prompt and ls aliases
+  ansible.builtin.blockinfile:
+    path: "/home/homebrew/.bashrc"
+    create: true
+    owner: "homebrew"
+    group: "homebrew"
+    mode: '0600'
+    block: |
+      export PS1='{{ homebrew_prompt }}'
+      alias ls='ls $LS_OPTIONS'
+      alias ll='ls $LS_OPTIONS -l'
+      alias l='ls $LS_OPTIONS -lA'
+  become: true
+
+- name: Set homebrew user vimrc config
+  ansible.builtin.lineinfile:
+    path: "/home/homebrew/.vimrc"
+    create: true
+    owner: "homebrew"
+    group: "homebrew"
+    mode: '0600'
+    line: set mouse-=a
+  become: true
+
+- name: Set homebrew user password
+  ansible.builtin.user:
+    name: "homebrew"
+    password: "{{ homebrew_password | password_hash('sha512', password_salt | default('')) }}"
+  when: homebrew_password is defined
+  become: true

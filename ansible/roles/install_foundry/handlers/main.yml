@@ -1,0 +1,7 @@
+---
+- name: Restart foundry-vtt
+  ansible.builtin.systemd_service:
+    name: "foundry-vtt_v{{ foundry.version.split('.')[0] }}.service"
+    state: "restarted"
+  when: foundryvtt_start is not changed
+  become: true
