@@ -51,6 +51,7 @@
       ansible.builtin.file:
         path: "{{ foundry_tmp_dir.path }}"
         modification_time: "{{ '%Y%m%d%H%M.%S' | strftime(foundry_dir.stat.mtime) }}"
+        mode: '755'
       changed_when: false
       become: true
 
