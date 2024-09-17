@@ -1,9 +1,9 @@
 ---
-domain_name: "yggdrasil.local"
+domain_name: "domain.local"
 fqdn: "{{ hostname }}.{{ domain_name }}"
 internal_host: "{{ fqdn }}"
 external_hosts:
-  - "iy1sixwy.fbxos.fr"
+  - "my.host.fr"
 
 autostart: true
 
@@ -34,5 +34,5 @@ caddy:
                           \ | map('join') | list ) }}"
 
     clients:
-      - "phaelyn"
+      - "admin"
       - "visiteur"
